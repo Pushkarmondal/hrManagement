@@ -65,6 +65,28 @@ enum AuditAction {
   SIGN
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  HR_ADMIN
+  HR_VIEWER
+}
+
+model AdminUser {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  name         String
+  role         AdminRole  @default(SUPER_ADMIN)
+
+  passwordHash String
+  isActive     Boolean    @default(true)
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  auditlogs AuditLog[]
+}
+
+
 model Employee {
   id                    String         @id @default(uuid())
   email                 String         @unique
@@ -178,8 +200,7 @@ model Agreement {
 }
 
 model AuditLog {
-  id String @id @default(uuid())
-
+  id          String         @id @default(uuid())
   entityType AuditEntityType
   entityId   String
 
@@ -188,17 +209,20 @@ model AuditLog {
   actorEmail String?
 
   action   AuditAction
-  summary  String?
-  metadata Json?
+  summary     String?
+  metadata    Json?
 
-  employeeId String?
+  employeeId  String?
+  adminUserId String?
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime       @default(now())
 
-  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  employee    Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  adminUser   AdminUser?     @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
 
   @@index([entityType, entityId])
   @@index([employeeId])
+  @@index([adminUserId])
   @@index([actorType])
   @@index([action])
   @@index([createdAt])
