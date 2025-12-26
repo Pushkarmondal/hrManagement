@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EmployeeStatus {
+  DRAFT
+  INVITED
+  ONBOARDING_SUBMITTED
+  HR_VERIFIED
+  AGREEMENT_SENT
+  SIGNED
+}
+
+enum DocumentType {
+  ID_PROOF
+  ADDRESS_PROOF
+  PAN
+  EDUCATION
+  EXPERIENCE
+  PHOTO
+  OTHER
+}
+
+enum DocumentStatus {
+  UPLOADED
+  HR_VERIFIED
+  REJECTED
+}
+
+enum AgreementStatus {
+  GENERATED
+  SENT
+  SIGNED
+  FAILED
+}
+
+enum AuditActorType {
+  HR
+  EMPLOYEE
+  SYSTEM
+  WEBHOOK
+}
+
+enum AuditEntityType {
+  EMPLOYEE
+  ONBOARDING_PROFILE
+  DOCUMENT
+  AGREEMENT
+  WEBHOOK
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  STATUS_TRANSITION
+  UPLOAD
+  VERIFY
+  REJECT
+  WEBHOOK_RECEIVED
+  SIGN
+}
+
+model Employee {
+  id                    String         @id @default(uuid())
+  email                 String         @unique
+  fullName              String?
+  phone                 String?
+  status                EmployeeStatus @default(DRAFT)
+  invitedAt             DateTime?
+  onboardingSubmittedAt DateTime?
+  hrVerifiedAt          DateTime?
+  agreementSentAt       DateTime?
+  signedAt              DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  onboardingProfile OnboardingProfile?
+  documents         Document[]
+  agreements        Agreement[]
+  auditLogs         AuditLog[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OnboardingProfile {
+  id            String   @id @default(uuid())
+  employeeId    String   @unique
+  submittedData Json
+  submittedAt   DateTime @default(now())
+
+  verifiedSnapshot Json?
+  verifiedAt       DateTime?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  documents  Document[]
+  agreements Agreement[]
+
+  @@index([employeeId])
+  @@index([submittedAt])
+}
+
+model Document {
+  id                  String  @id @default(uuid())
+  employeeId          String
+  onboardingProfileId String?
+
+  type   DocumentType
+  status DocumentStatus @default(UPLOADED)
+
+  storageBucket  String
+  storageKey     String
+  checksumSha256 String?
+
+  uploadedAt        DateTime  @default(now())
+  verifiedAt        DateTime?
+  verifiedByHrEmail String?
+  rejectionReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee          Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  onboardingProfile OnboardingProfile? @relation(fields: [onboardingProfileId], references: [id], onDelete: SetNull)
+
+  @@unique([storageBucket, storageKey])
+  @@index([employeeId])
+  @@index([onboardingProfileId])
+  @@index([type])
+  @@index([status])
+}
+
+model Agreement {
+  id                  String @id @default(uuid())
+  employeeId          String
+  onboardingProfileId String
+
+  status AgreementStatus @default(GENERATED)
+
+  unsignedBucket String
+  unsignedKey    String
+  signedBucket   String?
+  signedKey      String?
+
+  checksumSha256 String
+
+  provider          String?
+  providerRequestId String?
+  providerSigningId String?
+  providerPayload   Json?
+
+  generatedAt   DateTime  @default(now())
+  sentAt        DateTime?
+  signedAt      DateTime?
+  failedAt      DateTime?
+  failureReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee          Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  onboardingProfile OnboardingProfile @relation(fields: [onboardingProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([unsignedBucket, unsignedKey])
+  @@index([employeeId])
+  @@index([onboardingProfileId])
+  @@index([status])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  entityType AuditEntityType
+  entityId   String
+
+  actorType  AuditActorType
+  actorId    String?
+  actorEmail String?
+
+  action   AuditAction
+  summary  String?
+  metadata Json?
+
+  employeeId String?
+
+  createdAt DateTime @default(now())
+
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([employeeId])
+  @@index([actorType])
+  @@index([action])
+  @@index([createdAt])
+}
