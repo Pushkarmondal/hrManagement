@@ -5,9 +5,10 @@ const router = express.Router();
 const app = express();
 
 router.get("/health", healthCheck);
+app.use(router);
 
-app.listen(3000, () => {
-    console.log("Server started on port 3000");
+app.listen(5003, () => {
+    console.log("Server started on port 5003");
 })
 
 export default app;
