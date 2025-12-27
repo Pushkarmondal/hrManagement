@@ -8,11 +8,13 @@
     "@types/pg": "^8.16.0",
     "prisma": "^7.2.0",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.16"
   },
   "scripts": {
     "dev": "tsx index.ts",
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "vitest"
   },
   "peerDependencies": {
     "typescript": "^5"

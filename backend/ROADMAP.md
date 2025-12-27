@@ -67,12 +67,12 @@ Before writing any code, these are **non-negotiable**:
 **Goal:** Get basic backend running
 
 **Tasks:**
-- [ ] Initialize repo (monorepo or single)
-- [ ] Set up Node.js + TypeScript + Express
-- [ ] Install Prisma ORM
-- [ ] Set up PostgreSQL connection
-- [ ] Set up Redis connection
-- [ ] Create `/health` endpoint
+- [x] Initialize repo (monorepo or single)
+- [x] Set up Node.js + TypeScript + Express
+- [x] Install Prisma ORM
+- [x] Set up PostgreSQL connection
+- [x] Set up Redis connection
+- [x] Create `/health` endpoint
 
 **Deliverable:**
 ```bash
@@ -89,21 +89,21 @@ curl http://localhost:3000/health
 **Goal:** Build the foundation with correct constraints
 
 **Tasks:**
-- [ ] Define Prisma schema for all tables:
-  - [ ] `employees`
-  - [ ] `onboarding_profiles`
-  - [ ] `documents`
-  - [ ] `agreements`
-  - [ ] `audit_logs`
-- [ ] Create status enum
-- [ ] Add DB trigger to prevent updates after `SIGNED`
-- [ ] Make `audit_logs` append-only (no UPDATE/DELETE)
-- [ ] Run migrations
+- [x] Define Prisma schema for all tables:
+  - [x] `employees`
+  - [x] `onboarding_profiles`
+  - [x] `documents`
+  - [x] `agreements`
+  - [x] `audit_logs`
+- [x] Create status enum
+- [x] Add DB trigger to prevent updates after `SIGNED`
+- [x] Make `audit_logs` append-only (no UPDATE/DELETE)
+- [x] Run migrations
 
 **Deliverable:**
-- [ ] `prisma migrate deploy` works cleanly
-- [ ] Can insert test data manually
-- [ ] Illegal state changes are blocked by DB
+- [x] `prisma migrate deploy` works cleanly
+- [x] Can insert test data manually
+- [x] Illegal state changes are blocked by DB
 
 **Test:**
 ```sql
@@ -450,7 +450,7 @@ hr-onboarding-system/
 ## 🎯 Success Metrics
 
 **Week 1 (Steps 0-5):**
-- [ ] Database schema deployed
+- [x] Database schema deployed
 - [ ] State machine working
 - [ ] Auth functional
 - [ ] Audit logs capturing everything
