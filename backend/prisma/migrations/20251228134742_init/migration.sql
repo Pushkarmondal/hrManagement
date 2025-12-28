@@ -19,6 +19,23 @@ CREATE TYPE "AuditEntityType" AS ENUM ('EMPLOYEE', 'ONBOARDING_PROFILE', 'DOCUME
 -- CreateEnum
 CREATE TYPE "AuditAction" AS ENUM ('CREATE', 'UPDATE', 'STATUS_TRANSITION', 'UPLOAD', 'VERIFY', 'REJECT', 'WEBHOOK_RECEIVED', 'SIGN');
 
+-- CreateEnum
+CREATE TYPE "AdminRole" AS ENUM ('SUPER_ADMIN', 'HR_ADMIN', 'HR_VIEWER');
+
+-- CreateTable
+CREATE TABLE "AdminUser" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "role" "AdminRole" NOT NULL DEFAULT 'SUPER_ADMIN',
+    "passwordHash" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AdminUser_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateTable
 CREATE TABLE "Employee" (
     "id" TEXT NOT NULL,
@@ -111,10 +128,14 @@ CREATE TABLE "AuditLog" (
     "summary" TEXT,
     "metadata" JSONB,
     "employeeId" TEXT,
+    "adminUserId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AdminUser_email_key" ON "AdminUser"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Employee_email_key" ON "Employee"("email");
@@ -168,6 +189,9 @@ CREATE INDEX "AuditLog_entityType_entityId_idx" ON "AuditLog"("entityType", "ent
 CREATE INDEX "AuditLog_employeeId_idx" ON "AuditLog"("employeeId");
 
 -- CreateIndex
+CREATE INDEX "AuditLog_adminUserId_idx" ON "AuditLog"("adminUserId");
+
+-- CreateIndex
 CREATE INDEX "AuditLog_actorType_idx" ON "AuditLog"("actorType");
 
 -- CreateIndex
@@ -193,3 +217,6 @@ ALTER TABLE "Agreement" ADD CONSTRAINT "Agreement_onboardingProfileId_fkey" FORE
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_adminUserId_fkey" FOREIGN KEY ("adminUserId") REFERENCES "AdminUser"("id") ON DELETE SET NULL ON UPDATE CASCADE;
