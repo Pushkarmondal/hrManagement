@@ -227,3 +227,20 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
 }
+
+model Event {
+  id          String   @id @default(uuid())
+  type        String
+  payload     Json
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  retryCount  Int      @default(0)
+  failureReason String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([processed, createdAt])
+  @@index([type])
+  @@index([createdAt])
+}
