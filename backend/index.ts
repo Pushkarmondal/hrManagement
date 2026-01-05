@@ -2,6 +2,7 @@ import express from "express";
 import { healthCheck } from "./src/controllers/health.controller";
 import authRoutes from "./src/routes/auth.routes";
 import { requireAuth } from "./src/middleware/auth.middleware";
+import { registerHRRoutes } from "./src/controllers/hr.controller";
 
 
 const router = express.Router();
@@ -20,6 +21,7 @@ app.get("/", requireAuth, (req, res) => {
 })
 
 app.use(router);
+registerHRRoutes(app);
 
 app.listen(5003, () => {
     console.log("Server started on port 5003");
