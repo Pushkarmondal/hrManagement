@@ -1,3 +1,4 @@
+import { sendAgreement } from "../controllers/agreement.controller";
 import { requireHRAdmin } from "../controllers/hr.controller";
 import { rejectOnboarding, verifyOnboarding } from "../controllers/onboarding.controller";
 
@@ -14,4 +15,12 @@ export const registerHRRoutes = (app: any) => {
     requireHRAdmin,
     rejectOnboarding
   );
+
+  app.post(
+    "/hr/onboarding/:id/send-agreement",
+    requireHRAdmin,
+    sendAgreement
+  );
 };
+
+
