@@ -2,20 +2,28 @@
 // HR CORE APIs - STEP 6 (Production-Ready with Fixes)
 // ============================================================================
 
-import type { Request, Response, NextFunction } from 'express';
-import { AuditAction, AuditActorType, AuditEntityType, EmployeeStatus, Prisma } from '../generated/prisma/client';
-import { prisma } from '../../db/db';
+import type { Request, Response, NextFunction } from "express";
+import {
+  AuditAction,
+  AuditActorType,
+  AuditEntityType,
+  EmployeeStatus,
+  Prisma,
+} from "../generated/prisma/client";
+import { prisma } from "../../db/db";
+import { emitEvent } from "../events/eventBus";
+import { EventType } from "../events/types";
 
 // ============================================================================
 // STATE MACHINE - EMPLOYEE STATUS TRANSITIONS
 // ============================================================================
 
 const EMPLOYEE_STATE_TRANSITIONS: Record<EmployeeStatus, EmployeeStatus[]> = {
-  DRAFT: ['INVITED'],
-  INVITED: ['ONBOARDING_SUBMITTED'],
-  ONBOARDING_SUBMITTED: ['HR_VERIFIED'],
-  HR_VERIFIED: ['AGREEMENT_SENT'],
-  AGREEMENT_SENT: ['SIGNED'],
+  DRAFT: ["INVITED"],
+  INVITED: ["ONBOARDING_SUBMITTED"],
+  ONBOARDING_SUBMITTED: ["HR_VERIFIED"],
+  HR_VERIFIED: ["AGREEMENT_SENT"],
+  AGREEMENT_SENT: ["SIGNED"],
   SIGNED: [],
 };
 
@@ -27,9 +35,9 @@ export class InvalidStateTransitionError extends Error {
   ) {
     super(
       `Invalid state transition: ${current} → ${attempted}. ` +
-      `Allowed transitions: [${allowed.join(', ') || 'none'}]`
+        `Allowed transitions: [${allowed.join(", ") || "none"}]`
     );
-    this.name = 'InvalidStateTransitionError';
+    this.name = "InvalidStateTransitionError";
   }
 }
 
@@ -64,7 +72,7 @@ interface AuthRequest extends Request {
   user?: {
     sub: string;
     email: string;
-    role: 'HR_ADMIN' | 'HR_VIEWER' | 'SUPER_ADMIN';
+    role: "HR_ADMIN" | "HR_VIEWER" | "SUPER_ADMIN";
   };
 }
 
@@ -93,19 +101,23 @@ export function normalizeEmail(email: string): string {
 /**
  * Middleware to ensure user has HR role (SUPER_ADMIN, HR_ADMIN, or HR_VIEWER)
  */
-export const requireHR = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireHR = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-      error: 'Authentication required'
+      error: "Authentication required",
     });
   }
 
-  const validRoles = ['SUPER_ADMIN', 'HR_ADMIN', 'HR_VIEWER'];
+  const validRoles = ["SUPER_ADMIN", "HR_ADMIN", "HR_VIEWER"];
   if (!validRoles.includes(req.user.role)) {
     return res.status(403).json({
       success: false,
-      error: 'HR role required for this action'
+      error: "HR role required for this action",
     });
   }
 
@@ -115,19 +127,23 @@ export const requireHR = (req: AuthRequest, res: Response, next: NextFunction) =
 /**
  * Middleware to ensure user can modify (not just view)
  */
-export const requireHRAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireHRAdmin = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-      error: 'Authentication required'
+      error: "Authentication required",
     });
   }
 
-  const adminRoles = ['SUPER_ADMIN', 'HR_ADMIN'];
+  const adminRoles = ["SUPER_ADMIN", "HR_ADMIN"];
   if (!adminRoles.includes(req.user.role)) {
     return res.status(403).json({
       success: false,
-      error: 'HR Admin role required for this action'
+      error: "HR Admin role required for this action",
     });
   }
 
@@ -148,20 +164,22 @@ const validatePhone = (phone: string): boolean => {
   return phone.length >= 10 && phoneRegex.test(phone);
 };
 
-const validateCreateEmployee = (data: any): { valid: boolean; errors: string[] } => {
+const validateCreateEmployee = (
+  data: any
+): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
   if (!data.email || !validateEmail(data.email)) {
-    errors.push('Valid email is required');
+    errors.push("Valid email is required");
   }
 
   if (data.phone && !validatePhone(data.phone)) {
-    errors.push('Invalid phone number format');
+    errors.push("Invalid phone number format");
   }
 
   return {
     valid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
@@ -180,7 +198,7 @@ export const createEmployee = async (req: AuthRequest, res: Response) => {
     if (!validation.valid) {
       return res.status(400).json({
         success: false,
-        errors: validation.errors
+        errors: validation.errors,
       });
     }
 
@@ -189,14 +207,14 @@ export const createEmployee = async (req: AuthRequest, res: Response) => {
 
     // Check if employee already exists
     const existingEmployee = await prisma.employee.findUnique({
-      where: { email: normalizedEmail }
+      where: { email: normalizedEmail },
     });
 
     if (existingEmployee) {
       return res.status(409).json({
         success: false,
-        error: 'Employee with this email already exists',
-        existingEmployeeId: existingEmployee.id
+        error: "Employee with this email already exists",
+        existingEmployeeId: existingEmployee.id,
       });
     }
 
@@ -206,42 +224,44 @@ export const createEmployee = async (req: AuthRequest, res: Response) => {
         email: normalizedEmail,
         fullName: fullName?.trim(),
         phone: phone?.trim(),
-        status: EmployeeStatus.DRAFT
-      }
+        status: EmployeeStatus.DRAFT,
+      },
     });
 
     // Create audit log (non-blocking)
-    await prisma.auditLog.create({
-      data: {
-        entityType: AuditEntityType.EMPLOYEE,
-        entityId: employee.id,
-        actorType: AuditActorType.HR,
-        actorId: req.user!.sub,
-        actorEmail: req.user!.email,
-        action: AuditAction.CREATE,
-        summary: `Employee created: ${employee.email}`,
-        metadata: {
-          email: employee.email,
-          fullName: employee.fullName,
-          phone: employee.phone
+    await prisma.auditLog
+      .create({
+        data: {
+          entityType: AuditEntityType.EMPLOYEE,
+          entityId: employee.id,
+          actorType: AuditActorType.HR,
+          actorId: req.user!.sub,
+          actorEmail: req.user!.email,
+          action: AuditAction.CREATE,
+          summary: `Employee created: ${employee.email}`,
+          metadata: {
+            email: employee.email,
+            fullName: employee.fullName,
+            phone: employee.phone,
+          },
+          employeeId: employee.id,
+          adminUserId: req.user!.sub,
         },
-        employeeId: employee.id,
-        adminUserId: req.user!.sub
-      }
-    }).catch(err => {
-      console.error('[AUDIT ERROR]', err);
-    });
+      })
+      .catch((err) => {
+        console.error("[AUDIT ERROR]", err);
+      });
 
     res.status(201).json({
       success: true,
       data: employee,
-      message: 'Employee created successfully'
+      message: "Employee created successfully",
     });
   } catch (error) {
-    console.error('Error creating employee:', error);
+    console.error("Error creating employee:", error);
     res.status(500).json({
       success: false,
-      error: 'Failed to create employee'
+      error: "Failed to create employee",
     });
   }
 };
@@ -249,7 +269,7 @@ export const createEmployee = async (req: AuthRequest, res: Response) => {
 /**
  * POST /hr/employees/:id/invite
  * Send invitation to employee
- * 
+ *
  * FIX #1: Wrapped in transaction (state + audit + outbox)
  * FIX #2: Uses durable outbox pattern instead of direct event
  */
@@ -259,13 +279,13 @@ export const inviteEmployee = async (req: AuthRequest, res: Response) => {
 
     // Find employee outside transaction (read-only check)
     const employee = await prisma.employee.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!employee) {
       return res.status(404).json({
         success: false,
-        error: 'Employee not found'
+        error: "Employee not found",
       });
     }
 
@@ -279,7 +299,7 @@ export const inviteEmployee = async (req: AuthRequest, res: Response) => {
           error: error.message,
           currentStatus: error.current,
           attemptedStatus: error.attempted,
-          allowedTransitions: error.allowed
+          allowedTransitions: error.allowed,
         });
       }
       throw error;
@@ -292,8 +312,8 @@ export const inviteEmployee = async (req: AuthRequest, res: Response) => {
         where: { id },
         data: {
           status: EmployeeStatus.INVITED,
-          invitedAt: new Date()
-        }
+          invitedAt: new Date(),
+        },
       });
 
       // 2. Create audit log
@@ -309,49 +329,59 @@ export const inviteEmployee = async (req: AuthRequest, res: Response) => {
           metadata: {
             previousStatus: employee.status,
             newStatus: EmployeeStatus.INVITED,
-            invitedBy: req.user!.email
+            invitedBy: req.user!.email,
           },
           employeeId: employee.id,
-          adminUserId: req.user!.sub
-        }
+          adminUserId: req.user!.sub,
+        },
       });
 
       // 3. Create event (durable event emission)
       await tx.event.create({
         data: {
-          type: 'EMPLOYEE_INVITED',
+          type: "EMPLOYEE_INVITED",
           payload: {
             employeeId: employee.id,
             email: employee.email,
             fullName: employee.fullName,
             invitedBy: req.user!.email,
-            invitedAt: new Date().toISOString()
-          }
-        }
+            invitedAt: new Date().toISOString(),
+          },
+        },
       });
 
       return updatedEmployee;
     });
 
+    await emitEvent(
+      EventType.EMPLOYEE_INVITED,
+      {
+        employeeId: employee.id,
+        email: employee.email,
+        name: employee.fullName,
+      },
+      `invite:${employee.id}`
+    );
+
     res.json({
       success: true,
       data: result,
-      message: 'Invitation sent successfully'
+      message: "Invitation sent successfully",
     });
   } catch (error) {
-    console.error('Error inviting employee:', error);
-    
+    console.error("Error inviting employee:", error);
+
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       return res.status(500).json({
         success: false,
-        error: 'Database error occurred',
-        code: error.code
+        error: "Database error occurred",
+        code: error.code,
       });
     }
 
     res.status(500).json({
       success: false,
-      error: 'Failed to send invitation'
+      error: "Failed to send invitation",
     });
   }
 };
@@ -359,11 +389,14 @@ export const inviteEmployee = async (req: AuthRequest, res: Response) => {
 /**
  * GET /hr/onboarding/:id
  * View onboarding submission by onboarding profile ID
- * 
+ *
  * FIX #3: Changed audit action from UPDATE to VIEW
  * FIX #5: Conditional auditing (can be configured based on requirements)
  */
-export const getOnboardingSubmission = async (req: AuthRequest, res: Response) => {
+export const getOnboardingSubmission = async (
+  req: AuthRequest,
+  res: Response
+) => {
   try {
     const { id } = req.params;
 
@@ -373,46 +406,48 @@ export const getOnboardingSubmission = async (req: AuthRequest, res: Response) =
       include: {
         employee: true,
         documents: {
-          orderBy: { uploadedAt: 'desc' }
+          orderBy: { uploadedAt: "desc" },
         },
         agreements: {
-          orderBy: { createdAt: 'desc' }
-        }
-      }
+          orderBy: { createdAt: "desc" },
+        },
+      },
     });
 
     if (!onboardingProfile) {
       return res.status(404).json({
         success: false,
-        error: 'Onboarding submission not found'
+        error: "Onboarding submission not found",
       });
     }
 
     // Optional: Only audit if detailed view flag is set
-    const shouldAudit = req.query.auditView === 'true';
-    
+    const shouldAudit = req.query.auditView === "true";
+
     if (shouldAudit) {
       // Create audit log for sensitive view (non-blocking)
-      await prisma.auditLog.create({
-        data: {
-          entityType: AuditEntityType.ONBOARDING_PROFILE,
-          entityId: onboardingProfile.id,
-          actorType: AuditActorType.HR,
-          actorId: req.user!.sub,
-          actorEmail: req.user!.email,
-          action: 'VIEW' as any, // FIX: Changed from UPDATE
-          summary: `Onboarding profile viewed for ${onboardingProfile.employee.email}`,
-          metadata: {
+      await prisma.auditLog
+        .create({
+          data: {
+            entityType: AuditEntityType.ONBOARDING_PROFILE,
+            entityId: onboardingProfile.id,
+            actorType: AuditActorType.HR,
+            actorId: req.user!.sub,
+            actorEmail: req.user!.email,
+            action: "VIEW" as any, // FIX: Changed from UPDATE
+            summary: `Onboarding profile viewed for ${onboardingProfile.employee.email}`,
+            metadata: {
+              employeeId: onboardingProfile.employeeId,
+              viewedBy: req.user!.email,
+              viewType: "detailed",
+            },
             employeeId: onboardingProfile.employeeId,
-            viewedBy: req.user!.email,
-            viewType: 'detailed'
+            adminUserId: req.user!.sub,
           },
-          employeeId: onboardingProfile.employeeId,
-          adminUserId: req.user!.sub
-        }
-      }).catch(err => {
-        console.error('[AUDIT ERROR]', err);
-      });
+        })
+        .catch((err) => {
+          console.error("[AUDIT ERROR]", err);
+        });
     }
 
     res.json({
@@ -433,34 +468,35 @@ export const getOnboardingSubmission = async (req: AuthRequest, res: Response) =
           phone: onboardingProfile.employee.phone,
           status: onboardingProfile.employee.status,
           invitedAt: onboardingProfile.employee.invitedAt,
-          onboardingSubmittedAt: onboardingProfile.employee.onboardingSubmittedAt,
-          hrVerifiedAt: onboardingProfile.employee.hrVerifiedAt
+          onboardingSubmittedAt:
+            onboardingProfile.employee.onboardingSubmittedAt,
+          hrVerifiedAt: onboardingProfile.employee.hrVerifiedAt,
         },
-        documents: onboardingProfile.documents.map(doc => ({
+        documents: onboardingProfile.documents.map((doc) => ({
           id: doc.id,
           type: doc.type,
           status: doc.status,
           uploadedAt: doc.uploadedAt,
           verifiedAt: doc.verifiedAt,
           verifiedByHrEmail: doc.verifiedByHrEmail,
-          rejectionReason: doc.rejectionReason
+          rejectionReason: doc.rejectionReason,
         })),
-        agreements: onboardingProfile.agreements.map(agreement => ({
+        agreements: onboardingProfile.agreements.map((agreement) => ({
           id: agreement.id,
           status: agreement.status,
           generatedAt: agreement.generatedAt,
           sentAt: agreement.sentAt,
           signedAt: agreement.signedAt,
           failedAt: agreement.failedAt,
-          failureReason: agreement.failureReason
-        }))
-      }
+          failureReason: agreement.failureReason,
+        })),
+      },
     });
   } catch (error) {
-    console.error('Error fetching onboarding submission:', error);
+    console.error("Error fetching onboarding submission:", error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch onboarding submission'
+      error: "Failed to fetch onboarding submission",
     });
   }
 };
@@ -478,30 +514,30 @@ export const getEmployee = async (req: AuthRequest, res: Response) => {
       include: {
         onboardingProfile: true,
         documents: {
-          orderBy: { uploadedAt: 'desc' }
+          orderBy: { uploadedAt: "desc" },
         },
         agreements: {
-          orderBy: { createdAt: 'desc' }
-        }
-      }
+          orderBy: { createdAt: "desc" },
+        },
+      },
     });
 
     if (!employee) {
       return res.status(404).json({
         success: false,
-        error: 'Employee not found'
+        error: "Employee not found",
       });
     }
 
     res.json({
       success: true,
-      data: employee
+      data: employee,
     });
   } catch (error) {
-    console.error('Error fetching employee:', error);
+    console.error("Error fetching employee:", error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch employee'
+      error: "Failed to fetch employee",
     });
   }
 };
@@ -512,7 +548,7 @@ export const getEmployee = async (req: AuthRequest, res: Response) => {
  */
 export const listEmployees = async (req: AuthRequest, res: Response) => {
   try {
-    const { status, page = '1', limit = '20' } = req.query;
+    const { status, page = "1", limit = "20" } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
@@ -525,18 +561,18 @@ export const listEmployees = async (req: AuthRequest, res: Response) => {
         where,
         skip,
         take: limitNum,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           onboardingProfile: {
             select: {
               id: true,
               submittedAt: true,
-              verifiedAt: true
-            }
-          }
-        }
+              verifiedAt: true,
+            },
+          },
+        },
       }),
-      prisma.employee.count({ where })
+      prisma.employee.count({ where }),
     ]);
 
     res.json({
@@ -546,14 +582,14 @@ export const listEmployees = async (req: AuthRequest, res: Response) => {
         page: pageNum,
         limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limitNum)
-      }
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
-    console.error('Error listing employees:', error);
+    console.error("Error listing employees:", error);
     res.status(500).json({
       success: false,
-      error: 'Failed to list employees'
+      error: "Failed to list employees",
     });
   }
 };
@@ -563,11 +599,11 @@ export const listEmployees = async (req: AuthRequest, res: Response) => {
 // ============================================================================
 
 export const registerHRRoutes = (app: any) => {
-  app.post('/hr/employees', requireHRAdmin, createEmployee);
-  app.post('/hr/employees/:id/invite', requireHRAdmin, inviteEmployee);
-  app.get('/hr/onboarding/:id', requireHR, getOnboardingSubmission);
-  app.get('/hr/employees/:id', requireHR, getEmployee);
-  app.get('/hr/employees', requireHR, listEmployees);
+  app.post("/hr/employees", requireHRAdmin, createEmployee);
+  app.post("/hr/employees/:id/invite", requireHRAdmin, inviteEmployee);
+  app.get("/hr/onboarding/:id", requireHR, getOnboardingSubmission);
+  app.get("/hr/employees/:id", requireHR, getEmployee);
+  app.get("/hr/employees", requireHR, listEmployees);
 };
 
 // ============================================================================
@@ -586,5 +622,5 @@ export default {
   normalizeEmail,
   assertTransition,
   canTransition,
-  getValidTransitions
+  getValidTransitions,
 };
