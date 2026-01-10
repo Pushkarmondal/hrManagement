@@ -24,7 +24,7 @@ export async function scheduleReminders() {
         reminder: true
       },
       {
-        jobId: `reminder:${emp.id}`, // 🔒 idempotent
+        jobId: `reminder:${emp.id}`,
         removeOnComplete: true
       }
     );
