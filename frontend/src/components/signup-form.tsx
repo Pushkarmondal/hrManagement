@@ -46,14 +46,48 @@ export function SignupForm({ onGoToLogin }: { onGoToLogin?: () => void }) {
 
     setIsSubmitting(true)
     try {
-      // TODO: wire to backend endpoint (e.g. POST /admin/auth/signup or bootstrap-only flow)
-      await new Promise((r) => setTimeout(r, 600))
-      setSuccess("Account created. You can now log in.")
+      const response = await fetch("http://localhost:5003/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Handle error response from server
+        throw new Error(data.message || data.error || "Signup failed")
+      }
+
+      setSuccess("Account created successfully! You can now log in.")
       setForm({ name: "", email: "", password: "" })
-    } catch {
-      setError("Signup failed. Please try again.")
+      
+      // Optionally redirect to login after a delay
+      setTimeout(() => {
+        onGoToLogin?.()
+      }, 1500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Signup failed. Please try again.")
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleSubmit = (e: React.MouseEvent) => {
+    e.preventDefault()
+    onSubmit(e as unknown as React.FormEvent)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      onSubmit(e as unknown as React.FormEvent)
     }
   }
 
@@ -63,73 +97,74 @@ export function SignupForm({ onGoToLogin }: { onGoToLogin?: () => void }) {
         <CardTitle>Create account</CardTitle>
         <CardDescription>Sign up to access the admin dashboard.</CardDescription>
       </CardHeader>
-      <form onSubmit={onSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2 text-left">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              placeholder="Pushkar Mondal"
-              autoComplete="name"
-              value={form.name}
-              onChange={(e) => update("name", e.target.value)}
-            />
-          </div>
+      <CardContent className="space-y-4">
+        <div className="space-y-2 text-left">
+          <Label htmlFor="name">Name</Label>
+          <Input
+            id="name"
+            placeholder="Pushkar Mondal"
+            autoComplete="name"
+            value={form.name}
+            onChange={(e) => update("name", e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
 
-          <div className="space-y-2 text-left">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="pushkar@glowbook.com"
-              autoComplete="email"
-              value={form.email}
-              onChange={(e) => update("email", e.target.value)}
-            />
-          </div>
+        <div className="space-y-2 text-left">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="pushkar@glowbook.com"
+            autoComplete="email"
+            value={form.email}
+            onChange={(e) => update("email", e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
 
-          <div className="space-y-2 text-left">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="********"
-              autoComplete="new-password"
-              value={form.password}
-              onChange={(e) => update("password", e.target.value)}
-            />
-          </div>
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          {success ? (
-            <p className="text-sm text-green-600" role="status">
-              {success}
-            </p>
-          ) : null}
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3">
-          <Button className="w-full" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create account"}
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <a
-              className="text-primary underline-offset-4 hover:underline"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                onGoToLogin?.()
-              }}
-            >
-              Log in
-            </a>
+        <div className="space-y-2 text-left">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="********"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={(e) => update("password", e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
+        {error ? (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
           </p>
-        </CardFooter>
-      </form>
+        ) : null}
+
+        {success ? (
+          <p className="text-sm text-green-600" role="status">
+            {success}
+          </p>
+        ) : null}
+      </CardContent>
+      <CardFooter className="flex flex-col gap-3">
+        <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? "Creating..." : "Create account"}
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <a
+            className="text-primary underline-offset-4 hover:underline"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault()
+              onGoToLogin?.()
+            }}
+          >
+            Log in
+          </a>
+        </p>
+      </CardFooter>
     </Card>
   )
 }
